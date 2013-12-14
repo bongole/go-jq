@@ -6,11 +6,11 @@ package jq
 import "C"
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"unsafe"
-	"bytes"
 )
 
 const (
@@ -18,12 +18,12 @@ const (
 )
 
 type JQ struct {
-    src string
+	src string
 }
 
 func New(src string) *JQ {
 	jq := new(JQ)
-    jq.src = src
+	jq.src = src
 
 	return jq
 }
@@ -32,23 +32,23 @@ func toJson(str string) interface{} {
 	var data interface{}
 	json.Unmarshal([]byte(fmt.Sprintf("[%s]", str)), &data)
 	result := data.([]interface{})
-    return result[0]
+	return result[0]
 }
 
 func (self *JQ) Search(pattern string) (r interface{}, err error) {
-    jq_state := C.jq_init()
-    compiled := C.jq_compile(jq_state, C.CString(pattern))
+	jq_state := C.jq_init()
+	compiled := C.jq_compile(jq_state, C.CString(pattern))
 
-    if compiled != 1 {
-        C.jq_teardown(&jq_state)
-        err = errors.New("compile error")
-        return
-    }
+	if compiled != 1 {
+		C.jq_teardown(&jq_state)
+		err = errors.New("compile error")
+		return
+	}
 
-    jv_parser := C.jv_parser_new(0)
+	jv_parser := C.jv_parser_new(0)
 
-    processed := false
-    src := bytes.NewBufferString(self.src)
+	processed := false
+	src := bytes.NewBufferString(self.src)
 	buf := make([]byte, BUFSIZE)
 	for n, _ := src.Read(buf); n > 0; n, _ = src.Read(buf) {
 		C.jv_parser_set_buf(jv_parser, (*C.char)(unsafe.Pointer(&buf[0])), C.int(n), 1)
@@ -61,7 +61,7 @@ func (self *JQ) Search(pattern string) (r interface{}, err error) {
 				dumped := C.jv_dump_string(result, 0)
 				gostring := C.GoString(C.jv_string_value(dumped))
 				r = toJson(gostring)
-                processed = true
+				processed = true
 			}
 
 			C.jv_free(result)
@@ -72,7 +72,7 @@ func (self *JQ) Search(pattern string) (r interface{}, err error) {
 			gomsg := C.GoString(C.jv_string_value(msg))
 			C.jv_free(msg)
 			err = errors.New(gomsg)
-            goto end
+			goto end
 		} else {
 			C.jv_free(value)
 		}
@@ -80,8 +80,8 @@ func (self *JQ) Search(pattern string) (r interface{}, err error) {
 
 end:
 
-    C.jv_parser_free(jv_parser);
-    C.jq_teardown(&jq_state)
+	C.jv_parser_free(jv_parser)
+	C.jq_teardown(&jq_state)
 
 	return
 }
