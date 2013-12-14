@@ -35,10 +35,13 @@ func main(){
 
    jq := jq.New(src)
 
-   d, err := jq.Search(".foo")
-   if err == nil {
+   err := jq.Search(".foo", func(d interface{}){
       i := d.(float64)
       fmt.Printf("%f", i)
+   })
+
+   if err != nil {
+      fmt.Printf("%s", err)
    }
 }
 ```

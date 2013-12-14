@@ -7,24 +7,26 @@ import (
 func TestJQ(t *testing.T) {
 	jq := New("{ \"foo\": 1 }")
 
-	d, err := jq.Search(".")
-	m := d.(map[string]interface{})
-	if m["foo"].(float64) != 1 {
-		t.Errorf("invalid result")
-	}
+	err := jq.Search(".", func(d interface{}) {
+		m := d.(map[string]interface{})
+		if m["foo"].(float64) != 1 {
+			t.Errorf("invalid result")
+		}
+	})
 
-	d, err = jq.Search(".foo")
-	i := d.(float64)
-	if i != 1 {
-		t.Errorf("not a number")
-	}
+	err = jq.Search(".foo", func(d interface{}) {
+		i := d.(float64)
+		if i != 1 {
+			t.Errorf("not a number")
+		}
+	})
 
 	if err != nil {
 		t.Error(err)
 	}
 
 	jq = New("{ foo: 2 }")
-	d, err = jq.Search(".")
+	err = jq.Search(".", func(d interface{}) {})
 
 	if err == nil {
 		t.Error(err)

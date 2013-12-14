@@ -6,10 +6,11 @@ package jq
 import "C"
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"unsafe"
 )
 
@@ -17,11 +18,13 @@ const (
 	BUFSIZE = 4096
 )
 
+type handler func(interface{})
+
 type JQ struct {
-	src string
+	src interface{}
 }
 
-func New(src string) *JQ {
+func New(src interface{}) *JQ {
 	jq := new(JQ)
 	jq.src = src
 
@@ -35,7 +38,18 @@ func toJson(str string) interface{} {
 	return result[0]
 }
 
-func (self *JQ) Search(pattern string) (r interface{}, err error) {
+func (self *JQ) Search(pattern string, block handler) (err error) {
+	var src io.ReadSeeker
+	switch t := self.src.(type) {
+	case string:
+		src = strings.NewReader(t)
+	case io.ReadSeeker:
+		src = t
+	default:
+		err = errors.New("src is not io.ReadSeeker or string")
+		return
+	}
+
 	jq_state := C.jq_init()
 	compiled := C.jq_compile(jq_state, C.CString(pattern))
 
@@ -44,24 +58,21 @@ func (self *JQ) Search(pattern string) (r interface{}, err error) {
 		err = errors.New("compile error")
 		return
 	}
-
 	jv_parser := C.jv_parser_new(0)
 
-	processed := false
-	src := bytes.NewBufferString(self.src)
+	src.Seek(0, 0)
 	buf := make([]byte, BUFSIZE)
 	for n, _ := src.Read(buf); n > 0; n, _ = src.Read(buf) {
 		C.jv_parser_set_buf(jv_parser, (*C.char)(unsafe.Pointer(&buf[0])), C.int(n), 1)
 		var value C.jv
-		for value = C.jv_parser_next(jv_parser); C.jv_is_valid(value) != 0 && processed == false; value = C.jv_parser_next(jv_parser) {
+		for value = C.jv_parser_next(jv_parser); C.jv_is_valid(value) != 0; value = C.jv_parser_next(jv_parser) {
 			C.jq_start(jq_state, value, 0)
 
 			var result C.jv
-			for result = C.jq_next(jq_state); C.jv_is_valid(result) != 0 && processed == false; result = C.jq_next(jq_state) {
+			for result = C.jq_next(jq_state); C.jv_is_valid(result) != 0; result = C.jq_next(jq_state) {
 				dumped := C.jv_dump_string(result, 0)
 				gostring := C.GoString(C.jv_string_value(dumped))
-				r = toJson(gostring)
-				processed = true
+				block(toJson(gostring))
 			}
 
 			C.jv_free(result)
