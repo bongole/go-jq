@@ -3,7 +3,8 @@
 Go bindings for jq inspired by ruby-jq.
 
 see [http://stedolan.github.io/jq/](http://stedolan.github.io/jq/).
-see [https://bitbucket.org/winebarrel/ruby-jq](https://bitbucket.org/winebarrel/ruby-jq)
+
+see [https://bitbucket.org/winebarrel/ruby-jq](https://bitbucket.org/winebarrel/ruby-jq).
 
 ## Installation
 
@@ -26,17 +27,18 @@ package main
 
 import (
    "github.com/bongole/go-jq"
+   "fmt"
 )
 
 func main(){
-   src := "{\"foo\": 1}
+   src := "{ \"foo\": 1 }"
 
    jq := jq.New(src)
 
    d, err := jq.Search(".foo")
-   if err != nil {
+   if err == nil {
       i := d.(float64)
-      fmt.Printf("%d", i)
+      fmt.Printf("%f", i)
    }
 }
 ```
