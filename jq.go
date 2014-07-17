@@ -1,8 +1,11 @@
 package jq
 
-// #cgo LDFLAGS: -ljq
-// #include <jq.h>
-// typedef struct jv_parser jv_parser_struct;
+/*
+#cgo LDFLAGS: -ljq
+#include <jq.h>
+typedef struct jv_parser jv_parser_struct;
+extern void jq_err_callback(void *,jv);
+*/
 import "C"
 
 import (
@@ -22,11 +25,19 @@ type handler func(interface{})
 
 type JQ struct {
 	src interface{}
+    err error
+}
+
+//export jq_err_callback
+func jq_err_callback(p unsafe.Pointer, value C.jv) {
+    self := (*JQ)(p)
+    self.err = errors.New(C.GoString(C.jv_string_value(value)))
 }
 
 func New(src interface{}) *JQ {
 	jq := new(JQ)
 	jq.src = src
+    jq.err = nil
 
 	return jq
 }
@@ -51,6 +62,8 @@ func (self *JQ) Search(pattern string, block handler) (err error) {
 	}
 
 	jq_state := C.jq_init()
+    C.jq_set_error_cb(jq_state, (C.jq_err_cb)(C.jq_err_callback), unsafe.Pointer(self))
+
 	compiled := C.jq_compile(jq_state, C.CString(pattern))
 
 	if compiled != 1 {
@@ -80,16 +93,16 @@ func (self *JQ) Search(pattern string, block handler) (err error) {
 
 		if C.jv_invalid_has_msg(C.jv_copy(value)) != 0 {
 			msg := C.jv_invalid_get_msg(value)
-			gomsg := C.GoString(C.jv_string_value(msg))
+			self.err = errors.New(C.GoString(C.jv_string_value(msg)))
 			C.jv_free(msg)
-			err = errors.New(gomsg)
-			goto end
 		} else {
 			C.jv_free(value)
 		}
 	}
 
-end:
+    if self.err != nil {
+        err = self.err
+    }
 
 	C.jv_parser_free(jv_parser)
 	C.jq_teardown(&jq_state)

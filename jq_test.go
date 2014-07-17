@@ -31,4 +31,12 @@ func TestJQ(t *testing.T) {
 	if err == nil {
 		t.Error(err)
 	}
+
+	jq = New("{ foo: 2 }")
+	err = jq.Search(".bar", func(d interface{}) {})
+
+	if err == nil {
+		t.Error(err)
+	}
+
 }
